@@ -1,0 +1,8 @@
+boto3>=1.34
+requests>=2.31
+sseclient-py>=1.8
+python-dotenv>=1.0
+pyspark>=3.5
+pandas>=2.0
+matplotlib>=3.8
+pyathena>=3.0
