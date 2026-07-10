@@ -72,3 +72,4 @@ if __name__ == "__main__":
         replay(os.getenv("REPLAY_FILE", "sample.json"))
     else:
         raise ValueError(f"Unknown DATA_SOURCE: {SOURCE}")
+# usgs and replay support added
