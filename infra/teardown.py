@@ -1,58 +1,69 @@
-import boto3, os
-from dotenv import load_dotenv
+"""Tear down AWS resources created by infra/setup.py."""
+import os
+import sys
 
-load_dotenv()
+import boto3
 
-REGION  = os.getenv("AWS_REGION", "eu-west-1")
-STREAM  = os.getenv("KINESIS_STREAM", "wikimedia-stream")
-S3_RAW  = os.getenv("S3_RAW", "wikimedia-pipeline-raw")
-S3_BATCH = os.getenv("S3_BATCH", "wikimedia-pipeline-batch")
-DYNAMO  = os.getenv("DYNAMO_TABLE", "wikimedia-speed-view")
-CLUSTER = os.getenv("EMR_CLUSTER_ID", "")
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+import config
 
-session = boto3.Session(region_name=REGION)
+session = boto3.Session(region_name=config.AWS_REGION)
+cw = session.client("cloudwatch")
 
 
 def delete_stream():
     k = session.client("kinesis")
     try:
-        k.delete_stream(StreamName=STREAM)
-        print(f"Deleted stream: {STREAM}")
+        k.delete_stream(StreamName=config.KINESIS_STREAM)
+        print(f"Deleted stream: {config.KINESIS_STREAM}")
     except k.exceptions.ResourceNotFoundException:
         print("Stream not found")
 
 
 def empty_bucket(name):
-    bucket = boto3.resource("s3", region_name=REGION).Bucket(name)
+    bucket = boto3.resource("s3", region_name=config.AWS_REGION).Bucket(name)
     try:
         bucket.objects.all().delete()
         bucket.delete()
         print(f"Deleted bucket: {name}")
     except Exception:
-        print(f"Bucket not found: {name}")
+        print(f"Bucket not found / not empty-safe: {name}")
 
 
 def delete_table():
     d = session.client("dynamodb")
     try:
-        d.delete_table(TableName=DYNAMO)
-        print(f"Deleted table: {DYNAMO}")
+        d.delete_table(TableName=config.DYNAMO_TABLE)
+        print(f"Deleted table: {config.DYNAMO_TABLE}")
     except d.exceptions.ResourceNotFoundException:
         print("Table not found")
 
 
 def terminate_cluster():
-    if not CLUSTER:
-        print("No cluster ID set")
+    if not config.EMR_CLUSTER_ID:
+        print("No EMR_CLUSTER_ID set")
         return
-    session.client("emr").terminate_job_flows(JobFlowIds=[CLUSTER])
-    print(f"Terminating cluster: {CLUSTER}")
+    session.client("emr").terminate_job_flows(JobFlowIds=[config.EMR_CLUSTER_ID])
+    print(f"Terminating cluster: {config.EMR_CLUSTER_ID}")
+
+
+def delete_alarms():
+    names = [
+        f"{config.KINESIS_STREAM}-high-incoming",
+        f"{config.KINESIS_STREAM}-iterator-age",
+    ]
+    try:
+        cw.delete_alarms(AlarmNames=names)
+        print(f"Deleted alarms: {names}")
+    except Exception as e:
+        print(f"Alarms cleanup: {e}")
 
 
 if __name__ == "__main__":
+    delete_alarms()
     delete_stream()
-    empty_bucket(S3_RAW)
-    empty_bucket(S3_BATCH)
+    empty_bucket(config.S3_RAW)
+    empty_bucket(config.S3_BATCH)
     delete_table()
     terminate_cluster()
     print("Teardown complete.")
