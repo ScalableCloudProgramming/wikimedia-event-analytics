@@ -1,9 +1,5 @@
-"""
-Create Athena database + external tables over batch parquet output on S3.
-
-Run after at least one successful batch job so the parquet paths exist:
-    python serving/setup_athena.py
-"""
+# Create Athena DB + external tables over batch parquet on S3
+# Run after a successful batch job: python serving/setup_athena.py
 import boto3
 from pyathena import connect
 
@@ -25,6 +21,7 @@ def ensure_database(cursor):
 def ensure_wiki_edits_table(cursor):
     location = config.s3_uri(config.S3_BATCH, f"{config.S3_BATCH_PREFIX}wiki_edits")
     cursor.execute(f"DROP TABLE IF EXISTS {config.ATHENA_DB}.{config.ATHENA_TABLE}")
+    # SQL DDL string (not a docstring)
     cursor.execute(f"""
         CREATE EXTERNAL TABLE {config.ATHENA_DB}.{config.ATHENA_TABLE} (
             wiki  string,
@@ -81,7 +78,7 @@ def smoke_query(cursor):
 
 
 if __name__ == "__main__":
-    # Ensure Athena results prefix bucket is reachable
+    # Check batch bucket is reachable before creating tables
     s3 = boto3.client("s3", region_name=config.AWS_REGION)
     try:
         s3.head_bucket(Bucket=config.S3_BATCH)

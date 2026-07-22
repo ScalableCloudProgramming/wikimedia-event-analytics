@@ -1,9 +1,4 @@
-"""
-Speed layer — Kinesis consumer with time-bucketed sliding window.
-
-Writes top-N wikis for the last WINDOW_SECONDS into DynamoDB for the serving merge.
-Filters bot edits and non-edit event types when present.
-"""
+# Speed layer: Kinesis → time-bucketed sliding window → DynamoDB top-N
 import json
 import os
 import sys
@@ -20,8 +15,7 @@ table = boto3.resource("dynamodb", region_name=config.AWS_REGION).Table(config.D
 
 
 class SlidingWindow:
-    """Time-bucketed sliding window. Each bucket covers bucket_s seconds."""
-
+    # Each bucket covers bucket_s seconds; older buckets are evicted past window_s
     def __init__(self, window_s=300, bucket_s=10):
         self.window_s = window_s
         self.bucket_s = bucket_s
@@ -54,12 +48,11 @@ window = SlidingWindow(window_s=config.WINDOW_SECONDS)
 
 
 def should_count(record):
-    """Filter bots and non-content events when fields exist."""
+    # Drop bots; keep edit/new/categorize (and events with no type)
     if record.get("bot") is True:
         return False
     etype = record.get("type")
     if etype and etype not in ("edit", "new", "categorize"):
-        # still count unknowns without type (e.g. USGS)
         if "wiki" in record or "title" in record:
             return etype in ("edit", "new", "categorize")
     return True
@@ -84,7 +77,7 @@ def flush_to_dynamo():
                 "ts": ts,
                 "window": config.WINDOW_SECONDS,
             })
-    # clear stale ranks if top shrank
+    # clear stale ranks if top list shrank
     for rank in range(len(top) + 1, config.TOP_N + 1):
         try:
             table.delete_item(Key={"pk": f"speed#{rank}"})

@@ -1,8 +1,5 @@
-"""
-Serving layer — Lambda merge of batch (Athena) + speed (DynamoDB).
-
-Optional --plot writes a bar chart of the merged top-N view.
-"""
+# Serving layer: Lambda merge of batch (Athena) + speed (DynamoDB)
+# Optional --plot writes a bar chart of the merged top-N
 import argparse
 import os
 import sys
@@ -19,7 +16,7 @@ table = boto3.resource("dynamodb", region_name=config.AWS_REGION).Table(
 
 
 def get_speed_view():
-    """Pull current top-N from DynamoDB (speed layer)."""
+    # Current top-N from DynamoDB speed layer
     results = []
     for rank in range(1, config.TOP_N + 1):
         item = table.get_item(Key={"pk": f"speed#{rank}"}).get("Item")
@@ -29,7 +26,7 @@ def get_speed_view():
 
 
 def get_batch_view():
-    """Query Athena for historical top-N edit counts."""
+    # Historical top-N from Athena over batch parquet
     cursor = connect(
         s3_staging_dir=config.S3_ATHENA_OUT,
         region_name=config.AWS_REGION,
@@ -42,9 +39,7 @@ def get_batch_view():
 
 
 def merge(batch, speed):
-    """
-    Lambda merge: batch (full history) + speed (recent delta not yet in batch).
-    """
+    # batch = full history; speed = recent delta not yet in batch
     counts = {}
     for wiki, edits in batch:
         counts[wiki] = int(edits)

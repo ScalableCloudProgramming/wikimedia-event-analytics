@@ -9,5 +9,8 @@ venv/
 dist/
 build/
 .pytest_cache/
+.env
 benchmarks/results/*.png
 benchmarks/results/*.csv
+benchmarks/results/*.json
+!benchmarks/results/.gitkeep

@@ -1,4 +1,4 @@
-"""Upload batch_job.py to S3 and submit as an EMR Spark step."""
+# Upload batch_job.py to S3 and submit as an EMR Spark step
 import os
 import sys
 import time
@@ -31,19 +31,7 @@ def submit(executor_instances=None):
     ]
     if executor_instances:
         args += ["--num-executors", str(executor_instances)]
-    args += [
-        "--conf", f"spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
-        f"s3://{config.S3_BATCH}/{S3_KEY}",
-    ]
-    # Pass bucket paths into the job
-    args = [
-        "spark-submit",
-        "--deploy-mode", "cluster",
-        "--master", "yarn",
-        "--conf", "spark.sql.shuffle.partitions=100",
-        *(["--num-executors", str(executor_instances)] if executor_instances else []),
-        f"s3://{config.S3_BATCH}/{S3_KEY}",
-    ]
+    args.append(f"s3://{config.S3_BATCH}/{S3_KEY}")
     resp = emr.add_job_flow_steps(
         JobFlowId=config.EMR_CLUSTER_ID,
         Steps=[{
@@ -70,7 +58,7 @@ def wait(step_id, poll=20):
 
 
 def step_runtime_seconds(status):
-    """Extract wall-clock runtime from EMR step status timestamps."""
+    # Wall-clock runtime from EMR step timeline (for speedup charts)
     timeline = status.get("Timeline") or {}
     start = timeline.get("StartDateTime")
     end = timeline.get("EndDateTime")

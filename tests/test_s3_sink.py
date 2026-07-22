@@ -1,7 +1,6 @@
-"""Unit tests for S3 raw sink buffer logic (no AWS calls)."""
+# Unit tests for S3 raw sink buffer logic (no AWS calls)
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 

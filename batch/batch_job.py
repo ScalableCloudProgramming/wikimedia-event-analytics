@@ -1,13 +1,5 @@
-"""
-Batch layer — full-history views over raw Wikimedia events on S3.
-
-Aggregates:
-  - top wikis by edit count (human edits preferred when bot flag present)
-  - keyword frequency from page titles
-  - hourly edit volume
-  - edit type breakdown (edit / new / log / categorize)
-  - namespace summary when available
-"""
+# Batch layer: full-history Spark aggregates over S3 raw JSON
+# Outputs: wiki_edits, keywords, hourly, edit_types, namespaces
 import os
 import re
 
@@ -53,7 +45,7 @@ def run(spark):
         work = df.filter((F.col("bot") == False) | F.col("bot").isNull())  # noqa: E712
         print(f"After bot filter: {work.count()}")
 
-    # --- top wikis ---
+    # top wikis by edit count
     (work.groupBy("wiki")
          .agg(F.count("*").alias("edits"))
          .orderBy(F.desc("edits"))
@@ -61,7 +53,7 @@ def run(spark):
          .write.mode("overwrite")
          .parquet(f"{S3_OUT}wiki_edits/"))
 
-    # --- keywords from titles ---
+    # keyword frequency from page titles
     if _has_col(work, "title"):
         (work.select(F.explode(keywords("title")).alias("kw"))
              .groupBy("kw")
@@ -71,7 +63,7 @@ def run(spark):
              .write.mode("overwrite")
              .parquet(f"{S3_OUT}keywords/"))
 
-    # --- hourly volume ---
+    # hourly edit volume
     if _has_col(work, "timestamp"):
         (work.withColumn("hour", F.from_unixtime("timestamp", "yyyy-MM-dd HH"))
              .groupBy("hour")
@@ -80,7 +72,7 @@ def run(spark):
              .write.mode("overwrite")
              .parquet(f"{S3_OUT}hourly/"))
 
-    # --- edit type breakdown ---
+    # edit type breakdown
     if _has_col(work, "type"):
         (work.groupBy("type")
              .agg(F.count("*").alias("edits"))
@@ -88,7 +80,7 @@ def run(spark):
              .write.mode("overwrite")
              .parquet(f"{S3_OUT}edit_types/"))
 
-    # --- namespace summary ---
+    # namespace summary
     if _has_col(work, "namespace"):
         (work.groupBy("namespace")
              .agg(F.count("*").alias("edits"))

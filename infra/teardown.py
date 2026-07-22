@@ -1,4 +1,4 @@
-"""Tear down AWS resources created by infra/setup.py."""
+# Tear down resources created by infra/setup.py
 import os
 import sys
 

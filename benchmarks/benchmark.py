@@ -1,11 +1,6 @@
-"""
-Performance measurement: throughput, latency under load, batch speedup.
-
-Usage:
-  python benchmarks/benchmark.py --mode all
-  python benchmarks/benchmark.py --mode speedup --workers 1,2,4
-  python benchmarks/benchmark.py --mode latency --rates 10,50,100
-"""
+# Throughput / latency under load / batch speedup measurement + plots
+#   python benchmarks/benchmark.py --mode all
+#   python benchmarks/benchmark.py --mode speedup --workers 1,2,4
 import argparse
 import json
 import os
@@ -81,18 +76,13 @@ def _wait_for_wiki(table, wiki, timeout=45):
 
 
 def latency(rates=None):
-    """
-    Measure end-to-end latency under different burst rates.
-    Injects `rate` sentinel records quickly, then waits for the wiki key
-    to appear in DynamoDB speed view.
-    """
+    # Burst `rate` sentinel records, wait until wiki shows in DynamoDB speed view
     rates = rates or [10, 50, 100, 200]
     table = dynamo.Table(config.DYNAMO_TABLE)
     results = []
 
     for rate in rates:
         wiki = f"__bench_{rate}_{int(time.time())}__"
-        # burst `rate` records as fast as possible
         t0 = time.time()
         for i in range(rate):
             rec = {"wiki": wiki, "title": f"sentinel-{i}", "type": "edit", "bot": False}
@@ -128,17 +118,10 @@ def latency(rates=None):
 
 
 def speedup(runtimes=None, workers=None):
-    """
-    Plot batch speedup. Prefer measured EMR step runtimes.
-
-    If --workers is given and EMR_CLUSTER_ID is set, submits one step per
-    worker count via batch.submit (requires live cluster).
-    Otherwise uses runtimes dict or reads results/speedup_raw.json.
-    """
+    # Prefer live EMR timings; else speedup_raw.json; else template values
     raw_path = f"{OUT}/speedup_raw.json"
 
     if workers and config.EMR_CLUSTER_ID:
-        # live measurement path
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
         from batch import submit as batch_submit
 
@@ -159,7 +142,7 @@ def speedup(runtimes=None, workers=None):
             with open(raw_path) as f:
                 runtimes = {int(k): v for k, v in json.load(f).items()}
         else:
-            # placeholder only if no measurements yet — clearly labelled
+            # placeholder until real EMR numbers are collected
             print("WARN: no measured speedup data; writing template values")
             runtimes = {1: 480, 2: 265, 4: 145, 8: 85}
 
@@ -187,7 +170,7 @@ def speedup(runtimes=None, workers=None):
 
 
 def load_generator(rate_hz=50, seconds=30, wiki_prefix="loadtest"):
-    """Push synthetic events at a controlled rate for stress tests."""
+    # Synthetic events at a fixed rate for stress / latency tests
     end = time.time() + seconds
     interval = 1.0 / max(rate_hz, 0.1)
     n = 0

@@ -1,9 +1,4 @@
-"""
-Spark Structured Streaming speed layer — sliding window over Kinesis.
-
-Writes windowed wiki edit counts to S3 parquet (and console) so results
-survive beyond the driver process.
-"""
+# Spark Structured Streaming: sliding window over Kinesis → S3 parquet + console
 import os
 
 from pyspark.sql import SparkSession
@@ -42,6 +37,7 @@ def run(spark):
         .load()
     )
 
+    # Drop bots; require wiki field
     parsed = (
         raw
         .select(
@@ -55,6 +51,7 @@ def run(spark):
         )
     )
 
+    # 5-min sliding window, slide every 1 min
     windowed = (
         parsed
         .withWatermark("event_time", "1 minute")
@@ -62,7 +59,7 @@ def run(spark):
         .agg(F.count("*").alias("edits"))
     )
 
-    # Persist to S3 for serving / inspection
+    # Persist for serving / inspection
     q_s3 = (
         windowed.writeStream
         .outputMode("append")
@@ -73,7 +70,7 @@ def run(spark):
         .start()
     )
 
-    # Also print for live demo
+    # Live demo console output
     q_console = (
         windowed.writeStream
         .outputMode("complete")

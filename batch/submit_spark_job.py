@@ -1,4 +1,4 @@
-"""Compatibility wrapper — use batch/submit.py."""
+# Alias for batch/submit.py
 from submit import upload, submit, wait, step_runtime_seconds
 
 if __name__ == "__main__":

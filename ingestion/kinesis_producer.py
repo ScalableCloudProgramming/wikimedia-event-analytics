@@ -1,7 +1,4 @@
-"""
-Compatibility entrypoint — delegates to producer.py.
-Prefer: python ingestion/producer.py
-"""
+# Thin alias — prefer: python ingestion/producer.py
 import os
 import sys
 

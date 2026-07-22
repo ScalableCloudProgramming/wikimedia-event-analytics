@@ -1,113 +1,140 @@
 # Wikimedia Event Analytics
-### Scalable Real-Time Pipeline · Lambda Architecture · Python · Apache Spark · AWS
 
-A cloud-based pipeline that ingests the **Wikimedia Event Stream** in real time, processes it through a **batch layer** (accurate full-history views via PySpark on EMR) and a **speed layer** (low-latency sliding-window views via Kinesis), and serves merged results through a **serving layer** backed by S3/Athena + DynamoDB.
+**Scalable Real-Time Wikipedia Event Analytics Using Lambda Architecture**
+
+Python · Apache Spark · AWS (Kinesis, EMR, S3, Athena, DynamoDB)
+
+Ingests the [Wikimedia Event Stream](https://stream.wikimedia.org/v2/stream/recentchange), processes it through a **batch layer** (full-history PySpark on EMR) and a **speed layer** (5-minute sliding window → DynamoDB), and serves a **merged** top-wikis view via Athena + DynamoDB.
 
 ---
 
 ## Architecture
 
 ```
-Wikimedia SSE Stream
-        │
-        ▼
-┌───────────────────┐
-│  Kinesis Ingest   │   ← ingestion/kinesis_producer.py
-└────────┬──────────┘
-         │
-   ┌─────┴──────┐
-   │            │
-   ▼            ▼
-Batch Layer  Speed Layer
-(EMR/Spark)  (Kinesis + DynamoDB)
-   │            │
-   ▼            ▼
-S3 + Athena  DynamoDB
-   │            │
-   └─────┬──────┘
-         ▼
-  Serving Layer  ← serving/serving_layer.py
-         │
-         ▼
-    Query / API
+Wikimedia SSE
+      │
+      ▼
+┌─────────────┐     dual-write
+│  Producer   │──────────────────► S3 raw (JSONL) ──► Batch (EMR/Spark) ──► S3 parquet
+└──────┬──────┘                                              │
+       │ Kinesis                                             ▼
+       ▼                                                  Athena
+ Speed consumer ──► DynamoDB                                 │
+ (sliding window)                                            ▼
+                     Serving layer ◄──── merge batch + speed
+                            │
+                            ▼
+                     Query / charts
 ```
+
+Auto-scaling: EMR managed scaling (min/max instances, YARN memory pressure). CloudWatch alarms on Kinesis ingest and iterator age.
 
 ---
 
-## Repository Structure
+## Repository layout
 
 ```
 code/
-├── infrastructure/        AWS provisioning (Kinesis, S3, EMR, DynamoDB)
-├── ingestion/             Kinesis producer (Wikimedia SSE / USGS / replay)
-├── batch/                 PySpark batch job + EMR submit script
-├── speed/                 Stream processor + Spark Structured Streaming
-├── serving/               Lambda merge (batch + speed → unified view)
-└── benchmarks/            Throughput / latency / speedup measurement & plots
+├── config.py              Shared env / settings
+├── .env.example
+├── requirements.txt
+├── infra/                 AWS setup + teardown
+├── ingestion/             Producer + S3 raw sink
+├── batch/                 PySpark batch job + EMR submit
+├── speed/                 Sliding-window consumer + Spark streaming
+├── serving/               Athena setup + Lambda merge query
+├── benchmarks/            Throughput / latency / speedup
+├── tests/
+└── data/sample_events.jsonl
 ```
 
 ---
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Ingestion | AWS Kinesis Data Streams + Python boto3 |
-| Batch | PySpark on AWS EMR |
-| Speed | Kinesis consumer + sliding-window counter → DynamoDB |
-| Speed (H1) | Spark Structured Streaming with windowed aggregations |
-| Serving | Amazon Athena (batch) + DynamoDB (speed) merge |
-| Monitoring | Amazon CloudWatch |
-
----
-
-## Getting Started
+## Setup
 
 ```bash
-# 1. Install dependencies
-pip install -r ../config/requirements.txt
+cd code
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # fill AWS credentials / region / names
+```
 
-# 2. Copy and fill in AWS credentials
-cp ../config/.env.example ../config/.env
+### 1. Infrastructure
 
-# 3. Stand up AWS infrastructure
-python infrastructure/deploy_infrastructure.py
+```bash
+python infra/setup.py
+# set EMR_CLUSTER_ID=... in .env
+```
 
-# 4. Start ingestion
-python ingestion/kinesis_producer.py
+### 2. Ingestion (live or replay)
 
-# 5. Submit batch job to EMR
-python batch/submit_spark_job.py
+```bash
+# live Wikimedia stream (Kinesis + S3 dual-write)
+python ingestion/producer.py
 
-# 6. Start speed layer
-python speed/stream_processor.py
+# offline replay
+DATA_SOURCE=replay python ingestion/producer.py
+```
 
-# 7. Query serving layer
-python serving/serving_layer.py --query top_wikis
+### 3. Batch layer
 
-# 8. Run benchmarks
-python benchmarks/benchmark.py --mode all
+```bash
+python batch/submit.py
+# optional speedup run:
+python batch/submit.py --executors 4
+```
+
+### 4. Speed layer
+
+```bash
+python speed/consumer.py
+# optional Spark streaming variant:
+# python speed/streaming.py   # on EMR / local Spark with Kinesis connector
+```
+
+### 5. Serving (Athena tables + merge)
+
+```bash
+python serving/setup_athena.py
+python serving/query.py
+python serving/query.py --plot
+```
+
+### 6. Benchmarks
+
+```bash
+python benchmarks/benchmark.py --mode load --rate 50 --seconds 60
+python benchmarks/benchmark.py --mode throughput
+python benchmarks/benchmark.py --mode latency --rates 10,50,100,200
+python benchmarks/benchmark.py --mode speedup --workers 1,2,4
+```
+
+### 7. Tests
+
+```bash
+python tests/test_window.py
+python tests/test_s3_sink.py
+```
+
+### Teardown
+
+```bash
+python infra/teardown.py
 ```
 
 ---
 
-## Dataset
+## Real-time question
 
-**Wikimedia Event Streams** — true real-time SSE stream of every edit across Wikipedia and sister projects.
-
-- URL: `https://stream.wikimedia.org/v2/stream/recentchange`
-- No API key required
-- Format: Server-Sent Events (JSON payload per event)
-- Estimated rate: 10–50 events/s
-
-**Real-time question answered:**
-> *Which Wikipedia projects are receiving the most edits in the last 5 minutes?*
+> Which Wikipedia projects receive the most edits in the last 5 minutes (speed), over full history (batch), and combined (serving merge)?
 
 ---
 
 ## Contributors
 
-| Name | GitHub | Role |
-|------|--------|------|
-| Kasi Reddy | KASIREDDY009 | Batch layer, infrastructure, testing |
-| Vishvaksen | vishvak55 | Ingestion, speed layer, serving, benchmarks |
+| Name | GitHub | Focus |
+|------|--------|--------|
+| Kasi Reddy | KASIREDDY009 | Infra, batch, speed consumer, benchmarks |
+| Vishvaksen | vishvak55 | Ingestion, streaming, serving, tests |
+
+Repo: https://github.com/ScalableCloudProgramming/wikimedia-event-analytics

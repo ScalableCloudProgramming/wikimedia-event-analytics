@@ -1,9 +1,4 @@
-"""
-Buffered dual-write of raw events to S3 so the batch layer has full-history input.
-
-Flushes JSONL objects under s3://{S3_RAW}/{S3_RAW_PREFIX}yyyy/mm/dd/HH/
-when either the buffer size or time threshold is hit.
-"""
+# Buffered S3 dual-write for batch-layer raw input (JSONL under data/yyyy/mm/dd/HH/)
 import json
 import time
 import uuid
@@ -15,6 +10,7 @@ import config
 
 
 class S3RawSink:
+    # Flush when buffer hits flush_size or flush_seconds elapses
     def __init__(
         self,
         bucket=None,

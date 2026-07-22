@@ -1,7 +1,4 @@
-"""
-Shared configuration loaded from environment / .env.
-Canonical env var names used across the whole pipeline.
-"""
+# Shared pipeline settings from environment / .env
 import os
 from pathlib import Path
 
@@ -10,7 +7,7 @@ _ROOT = Path(__file__).resolve().parent
 try:
     from dotenv import load_dotenv
     load_dotenv(_ROOT / ".env")
-    load_dotenv()  # also allow process env / cwd .env
+    load_dotenv()
 except ImportError:
     pass
 
@@ -20,13 +17,13 @@ AWS_REGION = os.getenv("AWS_REGION", "eu-west-1")
 KINESIS_STREAM = os.getenv("KINESIS_STREAM", "wikimedia-stream")
 KINESIS_SHARDS = int(os.getenv("KINESIS_SHARDS", "2"))
 
-# S3 (bucket names without s3:// prefix)
+# S3 bucket names (no s3:// prefix)
 S3_RAW = os.getenv("S3_RAW", "wikimedia-pipeline-raw")
 S3_BATCH = os.getenv("S3_BATCH", "wikimedia-pipeline-batch")
 S3_RAW_PREFIX = os.getenv("S3_RAW_PREFIX", "data/")
 S3_BATCH_PREFIX = os.getenv("S3_BATCH_PREFIX", "output/")
 
-# DynamoDB
+# DynamoDB speed view
 DYNAMO_TABLE = os.getenv("DYNAMO_TABLE", "wikimedia-speed-view")
 
 # EMR
@@ -43,7 +40,7 @@ S3_ATHENA_OUT = os.getenv(
     "S3_ATHENA_OUT", f"s3://{S3_BATCH}/athena-results/"
 )
 
-# Pipeline behaviour
+# Ingestion + speed behaviour
 DATA_SOURCE = os.getenv("DATA_SOURCE", "wikimedia")
 WIKIMEDIA_URL = os.getenv(
     "WIKIMEDIA_URL",
@@ -58,11 +55,11 @@ REPLAY_RATE = float(os.getenv("REPLAY_RATE_HZ", "10"))
 WINDOW_SECONDS = int(os.getenv("WINDOW_SECONDS", "300"))
 TOP_N = int(os.getenv("TOP_N", "10"))
 
-# Dual-write: also land raw events on S3 for the batch layer
+# Dual-write buffer: flush raw events to S3 for the batch layer
 S3_RAW_FLUSH_SIZE = int(os.getenv("S3_RAW_FLUSH_SIZE", "50"))
 S3_RAW_FLUSH_SECONDS = float(os.getenv("S3_RAW_FLUSH_SECONDS", "10"))
 
-# Firehose (optional managed path raw → S3)
+# Optional Firehose path (raw → S3)
 FIREHOSE_STREAM = os.getenv("FIREHOSE_STREAM", "wikimedia-raw-firehose")
 USE_FIREHOSE = os.getenv("USE_FIREHOSE", "false").lower() in ("1", "true", "yes")
 

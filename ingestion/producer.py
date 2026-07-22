@@ -1,8 +1,4 @@
-"""
-Kinesis producer for Wikimedia Event Streams (and USGS / replay).
-
-Dual-writes every record to Kinesis (speed layer) and buffered S3 (batch layer).
-"""
+# Kinesis producer (Wikimedia / USGS / replay) with dual-write to S3 raw
 import json
 import os
 import sys
@@ -25,6 +21,7 @@ _sent = 0
 
 
 def put(record, key="default"):
+    # Speed path: Kinesis; batch path: buffered S3
     global _sent
     payload = json.dumps(record, default=str).encode()
     kinesis.put_record(

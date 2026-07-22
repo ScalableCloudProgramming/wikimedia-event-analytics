@@ -1,14 +1,9 @@
-"""
-Provision AWS resources for the Lambda pipeline.
-
-Auto-scaling (EMR managed scaling):
-  - Unit: Instances
-  - Min / Max: EMR_MIN_INSTANCES / EMR_MAX_INSTANCES (default 2–8)
-  - Trigger: YARN memory / available capacity (EMR managed scaling)
-  - Cool-down: EMR default managed-scaling cool-down (~ scales on sustained pressure)
-
-CloudWatch alarms on Kinesis IncomingRecords are created for demo visibility.
-"""
+# Provision Kinesis, S3, DynamoDB, EMR (managed scaling), CloudWatch alarms
+#
+# EMR auto-scaling:
+#   unit=Instances, min/max from EMR_MIN_INSTANCES / EMR_MAX_INSTANCES
+#   trigger=YARN memory pressure (EMR managed scaling)
+#   cool-down=EMR managed default
 import os
 import sys
 
@@ -67,7 +62,7 @@ def create_dynamo_table():
 
 
 def create_emr_cluster():
-    """EMR with managed scaling — scale triggers on YARN resource pressure."""
+    # Managed scaling reacts to YARN resource pressure within min/max bounds
     resp = emr.run_job_flow(
         Name="wikimedia-pipeline",
         ReleaseLabel="emr-6.15.0",
@@ -90,7 +85,6 @@ def create_emr_cluster():
                 "MaximumCoreCapacityUnits": config.EMR_MAX_INSTANCES,
             }
         },
-        # Scale-out when remaining YARN capacity is low for several minutes
         Configurations=[
             {
                 "Classification": "emrfs-site",
@@ -115,7 +109,7 @@ def create_emr_cluster():
 
 
 def create_kinesis_alarms():
-    """CloudWatch alarms for demo / monitoring of ingestion load."""
+    # Demo / monitoring: high ingest rate + consumer lag
     dims = [{"Name": "StreamName", "Value": config.KINESIS_STREAM}]
     try:
         cw.put_metric_alarm(
