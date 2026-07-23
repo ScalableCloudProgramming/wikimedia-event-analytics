@@ -6,3 +6,4 @@ pyspark>=3.5
 pandas>=2.0
 matplotlib>=3.8
 pyathena>=3.0
+streamlit>=1.32

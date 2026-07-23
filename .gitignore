@@ -14,3 +14,5 @@ benchmarks/results/*.png
 benchmarks/results/*.csv
 benchmarks/results/*.json
 !benchmarks/results/.gitkeep
+deploy/pipeline-code.zip
+deploy/ec2_instances.json
