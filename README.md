@@ -50,76 +50,60 @@ code/
 
 ---
 
-## Setup
+## AWS-only high-scale deploy (recommended)
+
+Continuous work runs on **EC2 + EMR**; laptop only calls AWS APIs.
 
 ```bash
 cd code
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill AWS credentials / region / names
+cp .env.example .env   # unique bucket names, region, LabInstanceProfile
+# configure AWS credentials, then:
+python deploy/orchestrate.py
 ```
 
-### 1. Infrastructure
+After bootstrap (~5 min): open Streamlit at `http://<dashboard-ip>:8501`.
 
-```bash
-python infra/setup.py
-# set EMR_CLUSTER_ID=... in .env
-```
+Full guide: [`docs/AWS_DEPLOY.md`](docs/AWS_DEPLOY.md)  
+Screenshot checklist: [`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md)
 
-### 2. Ingestion (live or replay)
+| Role on AWS | Process |
+|-------------|---------|
+| EC2 `wiki-producer` | `ingestion/high_scale.py` (live + fan-out + synthetic load) |
+| EC2 `wiki-speed` | `speed/consumer.py` |
+| EC2 `wiki-dashboard` | Streamlit `dashboard/app.py` :8501 |
+| EMR | `batch/submit.py` Spark job |
+| Athena / DynamoDB / CloudWatch | serving + metrics |
 
-```bash
-# live Wikimedia stream (Kinesis + S3 dual-write)
-python ingestion/producer.py
-
-# offline replay
-DATA_SOURCE=replay python ingestion/producer.py
-```
-
-### 3. Batch layer
+### Batch + Athena (after large ingest)
 
 ```bash
 python batch/submit.py
-# optional speedup run:
-python batch/submit.py --executors 4
-```
-
-### 4. Speed layer
-
-```bash
-python speed/consumer.py
-# optional Spark streaming variant:
-# python speed/streaming.py   # on EMR / local Spark with Kinesis connector
-```
-
-### 5. Serving (Athena tables + merge)
-
-```bash
 python serving/setup_athena.py
-python serving/query.py
-python serving/query.py --plot
 ```
 
-### 6. Benchmarks
+### Benchmarks
 
 ```bash
-python benchmarks/benchmark.py --mode load --rate 50 --seconds 60
 python benchmarks/benchmark.py --mode throughput
-python benchmarks/benchmark.py --mode latency --rates 10,50,100,200
+python benchmarks/benchmark.py --mode latency --rates 50,100,200,500
 python benchmarks/benchmark.py --mode speedup --workers 1,2,4
-```
-
-### 7. Tests
-
-```bash
-python tests/test_window.py
-python tests/test_s3_sink.py
+aws s3 cp benchmarks/results/ s3://$S3_BATCH/benchmarks/results/ --recursive
 ```
 
 ### Teardown
 
 ```bash
+python deploy/teardown_ec2.py
 python infra/teardown.py
+```
+
+### Local unit tests only
+
+```bash
+python tests/test_window.py
+python tests/test_s3_sink.py
 ```
 
 ---
