@@ -23,15 +23,29 @@ def upload():
 def submit(executor_instances=None):
     if not config.EMR_CLUSTER_ID:
         raise SystemExit("Set EMR_CLUSTER_ID in .env")
+    # client mode surfaces driver errors in step logs more reliably on Academy
     args = [
         "spark-submit",
-        "--deploy-mode", "cluster",
+        "--deploy-mode", "client",
         "--master", "yarn",
-        "--conf", "spark.sql.shuffle.partitions=100",
+        "--conf", "spark.sql.shuffle.partitions=50",
+        "--conf", "spark.yarn.submit.waitAppCompletion=true",
+        "--conf", "spark.pyspark.python=python3",
+        "--conf", "spark.pyspark.driver.python=python3",
     ]
     if executor_instances:
         args += ["--num-executors", str(executor_instances)]
-    args.append(f"s3://{config.S3_BATCH}/{S3_KEY}")
+    # Script + explicit S3 paths (EMR has no local .env)
+    s3_in = f"s3://{config.S3_RAW}/{config.S3_RAW_PREFIX.lstrip('/')}"
+    s3_out = f"s3://{config.S3_BATCH}/{config.S3_BATCH_PREFIX.lstrip('/')}"
+    args += [
+        f"s3://{config.S3_BATCH}/{S3_KEY}",
+        s3_in,
+        s3_out,
+        str(config.TOP_N),
+    ]
+
+    print(f"spark-submit paths in={s3_in} out={s3_out}")
     resp = emr.add_job_flow_steps(
         JobFlowId=config.EMR_CLUSTER_ID,
         Steps=[{
