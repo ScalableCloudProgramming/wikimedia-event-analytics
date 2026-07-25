@@ -113,21 +113,36 @@ def wikimedia_high_scale():
     if SYNTH_HZ > 0:
         pool.submit(synth_loop, stop)
 
+    # Wikimedia requires a descriptive User-Agent
+    headers = {
+        "User-Agent": "WikimediaEventAnalytics/1.0 (NCI MSc Cloud; academic pipeline)",
+        "Accept": "text/event-stream",
+    }
     try:
-        resp = requests.get(config.WIKIMEDIA_URL, stream=True, timeout=60)
-        resp.raise_for_status()
-        for event in sseclient.SSEClient(resp).events():
-            if not event.data:
-                continue
+        while not stop["stop"]:
             try:
-                rec = json.loads(event.data)
-                fanout_event(rec)
-                if _sent and _sent % 1000 < FANOUT:
-                    print(f"  sent≈{_sent} last={rec.get('wiki')} | {rec.get('title')}")
-            except json.JSONDecodeError:
-                pass
-    except KeyboardInterrupt:
-        pass
+                resp = requests.get(
+                    config.WIKIMEDIA_URL, stream=True, timeout=60, headers=headers
+                )
+                resp.raise_for_status()
+                for event in sseclient.SSEClient(resp).events():
+                    if stop["stop"]:
+                        break
+                    if not event.data:
+                        continue
+                    try:
+                        rec = json.loads(event.data)
+                        fanout_event(rec)
+                        if _sent and _sent % 1000 < FANOUT:
+                            print(f"  sent≈{_sent} last={rec.get('wiki')} | {rec.get('title')}")
+                    except json.JSONDecodeError:
+                        pass
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                # Keep synthetic load running if live stream blips
+                print(f"  wikimedia stream error (retry in 10s): {e}")
+                time.sleep(10)
     finally:
         stop["stop"] = True
         _flush_kinesis()

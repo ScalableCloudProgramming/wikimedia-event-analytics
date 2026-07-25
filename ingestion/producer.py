@@ -36,19 +36,32 @@ def put(record, key="default"):
 def wikimedia():
     print(f"Connecting to Wikimedia SSE: {config.WIKIMEDIA_URL}")
     print(f"Kinesis={config.KINESIS_STREAM}  S3 raw={config.S3_RAW}/{config.S3_RAW_PREFIX}")
-    resp = requests.get(config.WIKIMEDIA_URL, stream=True, timeout=60)
-    resp.raise_for_status()
+    headers = {
+        "User-Agent": "WikimediaEventAnalytics/1.0 (NCI MSc Cloud; academic pipeline)",
+        "Accept": "text/event-stream",
+    }
     try:
-        for event in sseclient.SSEClient(resp).events():
-            if not event.data:
-                continue
+        while True:
             try:
-                rec = json.loads(event.data)
-                put(rec, rec.get("wiki", "default"))
-                if _sent % 25 == 0:
-                    print(f"  sent={_sent} last={rec.get('wiki')} | {rec.get('title')}")
-            except json.JSONDecodeError:
-                pass
+                resp = requests.get(
+                    config.WIKIMEDIA_URL, stream=True, timeout=60, headers=headers
+                )
+                resp.raise_for_status()
+                for event in sseclient.SSEClient(resp).events():
+                    if not event.data:
+                        continue
+                    try:
+                        rec = json.loads(event.data)
+                        put(rec, rec.get("wiki", "default"))
+                        if _sent % 25 == 0:
+                            print(f"  sent={_sent} last={rec.get('wiki')} | {rec.get('title')}")
+                    except json.JSONDecodeError:
+                        pass
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                print(f"  stream error (retry 10s): {e}")
+                time.sleep(10)
     finally:
         s3_sink.close()
         print(f"Stopped. total_sent={_sent} s3_objects={s3_sink.objects_written}")
