@@ -1,8 +1,12 @@
 # Create Athena DB + external tables over batch parquet on S3
 # Run after a successful batch job: python serving/setup_athena.py
+import os
+import sys
+
 import boto3
 from pyathena import connect
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import config
 
 

@@ -110,21 +110,48 @@ def stream_status():
         return {"status": f"error: {e}", "shards": 0, "arn": ""}
 
 
-@st.cache_data(ttl=60)
+def _resolve_emr_cluster_id():
+    # Prefer env ID only if that cluster is still alive; else pick latest active pipeline cluster
+    cid = (config.EMR_CLUSTER_ID or "").strip()
+    live_states = {"STARTING", "BOOTSTRAPPING", "RUNNING", "WAITING"}
+    if cid:
+        try:
+            st = emr.describe_cluster(ClusterId=cid)["Cluster"]["Status"]["State"]
+            if st in live_states:
+                return cid, st
+        except Exception:
+            pass
+    try:
+        clusters = emr.list_clusters(
+            ClusterStates=["STARTING", "BOOTSTRAPPING", "RUNNING", "WAITING"]
+        ).get("Clusters", [])
+        # Prefer name match, then newest
+        named = [c for c in clusters if c.get("Name") == "wikimedia-pipeline"]
+        pick = (named or clusters)
+        if not pick:
+            return cid or "", "no active cluster"
+        best = pick[0]
+        return best["Id"], best["Status"]["State"]
+    except Exception as e:
+        return cid or "", f"lookup error: {e}"
+
+
+@st.cache_data(ttl=30)
 def emr_status():
-    cid = config.EMR_CLUSTER_ID
+    cid, hint_state = _resolve_emr_cluster_id()
     if not cid:
-        return {"state": "EMR_CLUSTER_ID not set", "instances": "—"}
+        return {"state": hint_state or "EMR_CLUSTER_ID not set", "instances": "—", "id": ""}
     try:
         c = emr.describe_cluster(ClusterId=cid)["Cluster"]
         return {
             "state": c["Status"]["State"],
             "name": c.get("Name"),
+            "id": cid,
             "instances": c.get("InstanceCollectionType", "INSTANCE_GROUP"),
             "normalized_hours": c.get("NormalizedInstanceHours", 0),
         }
     except Exception as e:
-        return {"state": str(e), "instances": "—"}
+        return {"state": str(e), "instances": "—", "id": cid}
 
 
 @st.cache_data(ttl=90)
@@ -185,7 +212,9 @@ except Exception as e:
 with col_a:
     st.metric("Kinesis", st_stream.get("status", "?"), f"{st_stream.get('shards', 0)} shards")
 with col_b:
-    st.metric("EMR", st_emr.get("state", "?")[:24])
+    emr_label = st_emr.get("state", "?")
+    # Show full short state; avoid truncated TERMINATED_WITH_ERRORS looking broken
+    st.metric("EMR", str(emr_label)[:28], st_emr.get("id", "")[:18] or None)
 with col_c:
     st.metric("S3 raw objects", f"{obj_n}{'+' if truncated else ''}", f"{obj_sz / 1e6:.1f} MB")
 with col_d:
