@@ -122,3 +122,7 @@ python tests/test_s3_sink.py
 | Vishvaksen | vishvak55 | Ingestion, streaming, serving, tests |
 
 Repo: https://github.com/ScalableCloudProgramming/wikimedia-event-analytics
+
+## IEEE report
+
+See `report/ieee_report.pdf` (source: `report/ieee_report.tex`) and `screenshots/` for demo evidence.
