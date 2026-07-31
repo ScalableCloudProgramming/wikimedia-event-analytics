@@ -225,9 +225,3 @@ See [`.env.example`](.env.example) for the full list. Important groups:
 |------|--------|
 | Kasireddy Vadicharla | [KASIREDDY009](https://github.com/KASIREDDY009) |
 | Vishvaksen Machana | [vishvak55](https://github.com/vishvak55) |
-
----
-
-## License
-
-Academic project for MSc Cloud Computing coursework. Use and adapt with attribution unless otherwise stated by the institution.
