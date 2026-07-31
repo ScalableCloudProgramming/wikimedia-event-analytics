@@ -56,8 +56,7 @@ Wikimedia SSE
 ├── dashboard/                # Streamlit results UI (runs on EC2)
 ├── benchmarks/               # Throughput / latency / speedup helpers
 ├── tests/                    # Unit tests (window, S3 sink)
-├── data/                     # Sample JSONL for offline replay
-└── docs/                     # Deploy notes
+└── data/                     # Sample JSONL for offline replay
 ```
 
 ---
