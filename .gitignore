@@ -23,3 +23,6 @@ screenshots/
 *.pdf
 **/ieee_report.pdf
 **/*_CHECKLIST.md
+
+# Local docs (not published with code)
+docs/
